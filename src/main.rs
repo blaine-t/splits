@@ -25,7 +25,7 @@ async fn main() {
         .route("/api/v0/split/new", post(new_split))
         .fallback_service(ServeDir::new("static"));
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:7758")
         .await
         .unwrap();
     println!("listening on {}", listener.local_addr().unwrap());
