@@ -16,7 +16,7 @@ pub struct Split {
     pub timestamp: String,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Clone, Deserialize, Debug)]
 pub struct SplitData {
     pub user: String,
     pub is_down: bool,

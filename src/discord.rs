@@ -7,6 +7,7 @@ use serenity::model::gateway::Ready;
 use serenity::model::id::ChannelId;
 use serenity::prelude::*;
 use sqlx::SqlitePool;
+use tracing::{error, info};
 
 pub struct Handler {
     pub context: SharedAppContext,
@@ -15,7 +16,7 @@ pub struct Handler {
 #[async_trait]
 impl EventHandler for Handler {
     async fn ready(&self, _ctx: Context, ready: Ready) {
-        println!("{} is connected!", ready.user.name);
+        info!("{} bot is connected to Discord!", ready.user.name);
         let mut context = self.context.lock().await;
         context.discord_ctx = Some(_ctx.clone());
     }
@@ -31,11 +32,11 @@ pub async fn send_split_to_discord(ctx: &Context, pool: &SqlitePool, config: &Co
                 .send_message(ctx, builder)
                 .await;
             if let Err(why) = message {
-                eprintln!("Error sending message: {why:?}");
+                error!("Error sending message: {why:?}");
             }
         }
         Err(e) => {
-            eprintln!("Error getting splits for Discord: {}", e);
+            error!("Error getting splits for Discord: {}", e);
         }
     }
 }

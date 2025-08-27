@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs;
 use std::path::Path;
+use tracing::{debug, error, info, warn};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -89,7 +90,7 @@ impl Default for ValidationConfig {
             username_whitelist: vec![],
             username_blacklist: vec![],
             max_duration_ms: 24 * 60 * 60 * 1000, // 24 hours
-            min_duration_ms: 100, // 100ms
+            min_duration_ms: 100,                 // 100ms
         }
     }
 }
@@ -104,10 +105,10 @@ impl Config {
             match toml::from_str::<Config>(&config_str) {
                 Ok(toml_config) => {
                     config = toml_config;
-                    println!("Loaded configuration from config.toml");
+                    debug!("Loaded configuration from config.toml");
                 }
                 Err(e) => {
-                    eprintln!("Warning: Failed to parse config.toml: {}", e);
+                    warn!("Failed to parse config.toml: {}", e);
                 }
             }
         }
@@ -121,15 +122,20 @@ impl Config {
     /// Validate the configuration
     fn validate(&self) -> Result<()> {
         if self.discord.token == "YOUR_TOKEN_HERE" {
+            error!("Discord Token not changed. Please update in config.toml");
             return Err(AppError::EnvVar(env::VarError::NotPresent));
         }
-        
+
         if self.discord.channel_id == 1234567890123456789 {
+            error!("Discord channel id not changed. Please update in config.toml");
             return Err(AppError::EnvVar(env::VarError::NotPresent));
         }
 
         if !Path::new(&self.server.static_dir).exists() {
-            eprintln!("Warning: Static directory '{}' does not exist", self.server.static_dir);
+            warn!(
+                "Static directory '{}' does not exist",
+                self.server.static_dir
+            );
         }
 
         Ok(())
@@ -140,9 +146,9 @@ impl Config {
         let config = Config::default();
         let toml_string = toml::to_string_pretty(&config)
             .map_err(|e| AppError::Network(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
-        
+
         fs::write("config.toml.example", toml_string)?;
-        println!("Generated config.toml.example");
+        info!("Generated config.toml.example");
         Ok(())
     }
 
@@ -160,29 +166,52 @@ mod tests {
     fn test_generate_sample_config() {
         // Clean up any existing example file
         let _ = fs::remove_file("config.toml.example");
-        
+
         // Generate the sample config
         Config::generate_sample_config().expect("Failed to generate sample config");
-        
+
         // Verify the file was created
         assert!(Path::new("config.toml.example").exists());
-        
+
         // Verify the file contains valid TOML that can be parsed back
-        let content = fs::read_to_string("config.toml.example").expect("Failed to read generated file");
-        let parsed_config: Config = toml::from_str(&content).expect("Generated config is not valid TOML");
-        
+        let content =
+            fs::read_to_string("config.toml.example").expect("Failed to read generated file");
+        let parsed_config: Config =
+            toml::from_str(&content).expect("Generated config is not valid TOML");
+
         // Verify it matches the default configuration
         let default_config = Config::default();
         assert_eq!(parsed_config.discord.token, default_config.discord.token);
-        assert_eq!(parsed_config.discord.channel_id, default_config.discord.channel_id);
+        assert_eq!(
+            parsed_config.discord.channel_id,
+            default_config.discord.channel_id
+        );
         assert_eq!(parsed_config.database.url, default_config.database.url);
         assert_eq!(parsed_config.server.host, default_config.server.host);
         assert_eq!(parsed_config.server.port, default_config.server.port);
-        assert_eq!(parsed_config.server.static_dir, default_config.server.static_dir);
-        assert_eq!(parsed_config.validation.max_username_length, default_config.validation.max_username_length);
-        assert_eq!(parsed_config.validation.username_whitelist, default_config.validation.username_whitelist);
-        assert_eq!(parsed_config.validation.username_blacklist, default_config.validation.username_blacklist);
-        assert_eq!(parsed_config.validation.max_duration_ms, default_config.validation.max_duration_ms);
-        assert_eq!(parsed_config.validation.min_duration_ms, default_config.validation.min_duration_ms);
+        assert_eq!(
+            parsed_config.server.static_dir,
+            default_config.server.static_dir
+        );
+        assert_eq!(
+            parsed_config.validation.max_username_length,
+            default_config.validation.max_username_length
+        );
+        assert_eq!(
+            parsed_config.validation.username_whitelist,
+            default_config.validation.username_whitelist
+        );
+        assert_eq!(
+            parsed_config.validation.username_blacklist,
+            default_config.validation.username_blacklist
+        );
+        assert_eq!(
+            parsed_config.validation.max_duration_ms,
+            default_config.validation.max_duration_ms
+        );
+        assert_eq!(
+            parsed_config.validation.min_duration_ms,
+            default_config.validation.min_duration_ms
+        );
     }
 }

@@ -7,23 +7,28 @@ use sqlx::SqlitePool;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tower_http::services::ServeDir;
+use tracing::{debug, error, info};
 
 #[tokio::main]
 async fn main() {
+    // Initialize tracing
+    tracing_subscriber::fmt::init();
+    
     if let Err(e) = run().await {
-        eprintln!("Application error: {}", e);
+        error!("Application error: {}", e);
         std::process::exit(1);
     }
 }
 
 async fn run() -> Result<()> {
-    // Load configuration from multiple sources
+    // Load configuration
     let config = Config::load()?;
-    
-    println!("Configuration loaded successfully");
-    println!("Server will start on: {}", config.server_address());
-    println!("Discord channel ID: {}", config.discord.channel_id);
-    println!("Database URL: {}", config.database.url);
+    info!("Configuration loaded successfully");
+
+    // Debug logs for extra information
+    debug!("Server will start on: {}", config.server_address());
+    debug!("Discord channel ID: {}", config.discord.channel_id);
+    debug!("Database URL: {}", config.database.url);
 
     // Initialize database pool with configuration
     let db_pool = SqlitePool::connect(&config.database.url).await?;
@@ -47,7 +52,7 @@ async fn run() -> Result<()> {
     // Run Discord client in a separate thread
     tokio::spawn(async move {
         if let Err(why) = client.start().await {
-            eprintln!("Client error: {why:?}");
+            error!("Client error: {why:?}");
         }
     });
 
@@ -58,7 +63,7 @@ async fn run() -> Result<()> {
         .fallback_service(ServeDir::new(&config.server.static_dir));
 
     let listener = tokio::net::TcpListener::bind(&config.server_address()).await?;
-    println!("listening on {}", listener.local_addr()?);
+    info!("listening on {}", listener.local_addr()?);
     axum::serve(listener, app).await?;
     
     Ok(())
