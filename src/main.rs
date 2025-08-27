@@ -11,6 +11,21 @@ use serenity::prelude::*;
 use std::env;
 use std::sync::Arc;
 use tower_http::services::ServeDir;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum AppError {
+    #[error("Database error: {0}")]
+    Database(#[from] sqlx::Error),
+    #[error("Discord error: {0}")]
+    Discord(#[from] serenity::Error),
+    #[error("Environment variable error: {0}")]
+    EnvVar(#[from] std::env::VarError),
+    #[error("Network error: {0}")]
+    Network(#[from] std::io::Error),
+}
+
+type Result<T> = std::result::Result<T, AppError>;
 
 #[derive(Clone)]
 struct AppContext {
@@ -32,19 +47,33 @@ impl EventHandler for Handler {
 }
 
 async fn send_split(ctx: &Context, pool: &SqlitePool) {
-    let builder = CreateMessage::new().content(all_splits_internal(pool).await);
-    let message = ChannelId::new(1410126283555344396)
-        .send_message(&ctx, builder)
-        .await;
-    if let Err(why) = message {
-        eprintln!("Error sending message: {why:?}");
-    };
+    match all_splits_internal(pool).await {
+        Ok(content) => {
+            let builder = CreateMessage::new().content(content);
+            let message = ChannelId::new(1410126283555344396)
+                .send_message(&ctx, builder)
+                .await;
+            if let Err(why) = message {
+                eprintln!("Error sending message: {why:?}");
+            }
+        }
+        Err(e) => {
+            eprintln!("Error getting splits for Discord: {}", e);
+        }
+    }
 }
 
 #[tokio::main]
 async fn main() {
+    if let Err(e) = run().await {
+        eprintln!("Application error: {}", e);
+        std::process::exit(1);
+    }
+}
+
+async fn run() -> Result<()> {
     // Initialize database pool
-    let db_pool = SqlitePool::connect("sqlite:splits.db").await.unwrap();
+    let db_pool = SqlitePool::connect("sqlite:splits.db").await?;
     
     // Create table if it doesn't exist
     sqlx::query(
@@ -58,22 +87,20 @@ async fn main() {
         )"
     )
     .execute(&db_pool)
-    .await
-    .unwrap();
+    .await?;
 
     let shared_context = Arc::new(Mutex::new(AppContext { 
         discord_ctx: None,
         db_pool: db_pool.clone(),
     }));
 
-    let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
+    let token = env::var("DISCORD_TOKEN")?;
 
     let intents = GatewayIntents::GUILDS;
     let handler = Handler { context: shared_context.clone() };
     let mut client = Client::builder(&token, intents)
         .event_handler(handler)
-        .await
-        .expect("Error creating client");
+        .await?;
 
     // Run Discord client in a separate thread
     tokio::spawn(async move {
@@ -88,16 +115,17 @@ async fn main() {
         .with_state(shared_context.clone())
         .fallback_service(ServeDir::new("static"));
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:7758").await.unwrap();
-    println!("listening on {}", listener.local_addr().unwrap());
-    axum::serve(listener, app).await.unwrap();
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:7758").await?;
+    println!("listening on {}", listener.local_addr()?);
+    axum::serve(listener, app).await?;
+    
+    Ok(())
 }
 
-async fn all_splits_internal(pool: &SqlitePool) -> String {
+async fn all_splits_internal(pool: &SqlitePool) -> Result<String> {
     let rows = sqlx::query("SELECT id, user, is_down, is_elevator, duration_ms, timestamp FROM splits")
         .fetch_all(pool)
-        .await
-        .unwrap();
+        .await?;
 
     let result = rows
         .iter()
@@ -122,12 +150,18 @@ async fn all_splits_internal(pool: &SqlitePool) -> String {
         })
         .collect::<Vec<String>>()
         .join("\n");
-    result
+    Ok(result)
 }
 
 async fn all_splits(State(context): State<Arc<Mutex<AppContext>>>) -> String {
     let ctx = context.lock().await;
-    all_splits_internal(&ctx.db_pool).await
+    match all_splits_internal(&ctx.db_pool).await {
+        Ok(splits) => splits,
+        Err(e) => {
+            eprintln!("Error getting splits: {}", e);
+            "Error retrieving splits".to_string()
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -141,7 +175,7 @@ struct SplitData {
 async fn new_split(State(context): State<Arc<Mutex<AppContext>>>, Json(data): Json<SplitData>) -> &'static str {
     let ctx = context.lock().await;
     
-    sqlx::query(
+    match sqlx::query(
         "INSERT INTO splits (user, is_down, is_elevator, duration_ms, timestamp) VALUES (?1, ?2, ?3, ?4, datetime('now'))"
     )
     .bind(&data.user)
@@ -149,11 +183,16 @@ async fn new_split(State(context): State<Arc<Mutex<AppContext>>>, Json(data): Js
     .bind(data.is_elevator)
     .bind(data.duration_ms)
     .execute(&ctx.db_pool)
-    .await
-    .unwrap();
-    
-    if let Some(discord_ctx) = &ctx.discord_ctx {
-        send_split(discord_ctx, &ctx.db_pool).await;
+    .await {
+        Ok(_) => {
+            if let Some(discord_ctx) = &ctx.discord_ctx {
+                send_split(discord_ctx, &ctx.db_pool).await;
+            }
+            "Data inserted!"
+        }
+        Err(e) => {
+            eprintln!("Error inserting split: {}", e);
+            "Error inserting data"
+        }
     }
-    "Data inserted!"
 }

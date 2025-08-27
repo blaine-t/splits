@@ -1485,6 +1485,7 @@ dependencies = [
  "serde",
  "serenity",
  "sqlx",
+ "thiserror 2.0.16",
  "tokio",
  "tower-http",
 ]
