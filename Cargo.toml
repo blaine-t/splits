@@ -5,8 +5,8 @@ edition = "2024"
 
 [dependencies]
 axum = { version = "0.8.4", default-features = false, features = ["http1", "json", "tokio"] }
-rusqlite = { version = "0.37.0", default-features = false }
 serde = { version = "1.0.219", default-features = false, features = ["derive"] }
 serenity = {version = "0.12.4", default-features = false, features = ["builder", "client", "gateway", "model", "rustls_backend"] }
+sqlx = { version = "0.8.6", default-features = false, features = ["sqlite", "runtime-tokio-rustls"] }
 tokio = { version = "1.47.1", default-features = false, features = ["macros", "net", "rt-multi-thread"] }
 tower-http = { version = "0.6.6", default-features = false, features = ["fs"] }

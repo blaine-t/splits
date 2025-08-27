@@ -1,7 +1,7 @@
 use axum::extract::State;
 use axum::Json;
 use axum::{Router, routing::get, routing::post};
-use rusqlite::{Connection, Result};
+use sqlx::{SqlitePool, Row};
 use serde::Deserialize;
 use serenity::async_trait;
 use serenity::builder::CreateMessage;
@@ -15,6 +15,7 @@ use tower_http::services::ServeDir;
 #[derive(Clone)]
 struct AppContext {
     discord_ctx: Option<Context>,
+    db_pool: SqlitePool,
 }
 
 struct Handler {
@@ -30,8 +31,8 @@ impl EventHandler for Handler {
     }
 }
 
-async fn send_split(ctx: &Context) {
-    let builder = CreateMessage::new().content(all_splits().await);
+async fn send_split(ctx: &Context, pool: &SqlitePool) {
+    let builder = CreateMessage::new().content(all_splits_internal(pool).await);
     let message = ChannelId::new(1410126283555344396)
         .send_message(&ctx, builder)
         .await;
@@ -42,7 +43,28 @@ async fn send_split(ctx: &Context) {
 
 #[tokio::main]
 async fn main() {
-    let shared_context = Arc::new(Mutex::new(AppContext { discord_ctx: None }));
+    // Initialize database pool
+    let db_pool = SqlitePool::connect("sqlite:splits.db").await.unwrap();
+    
+    // Create table if it doesn't exist
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS splits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user TEXT NOT NULL,
+            is_down BOOLEAN NOT NULL,
+            is_elevator BOOLEAN NOT NULL,
+            duration_ms INTEGER NOT NULL,
+            timestamp TEXT NOT NULL
+        )"
+    )
+    .execute(&db_pool)
+    .await
+    .unwrap();
+
+    let shared_context = Arc::new(Mutex::new(AppContext { 
+        discord_ctx: None,
+        db_pool: db_pool.clone(),
+    }));
 
     let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
 
@@ -60,21 +82,6 @@ async fn main() {
         }
     });
 
-    // Initialize database and create table if it doesn't exist
-    let conn = get_connection().unwrap();
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS splits (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user TEXT NOT NULL,
-            is_down BOOLEAN NOT NULL,
-            is_elevator BOOLEAN NOT NULL,
-            duration_ms INTEGER NOT NULL,
-            timestamp TEXT NOT NULL
-        )",
-        [],
-    )
-    .unwrap();
-
     let app = Router::new()
         .route("/api/v0/split/all", get(all_splits))
         .route("/api/v0/split/new", post(new_split))
@@ -86,59 +93,41 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-#[derive(Debug)]
-struct Split {
-    id: i32,
-    user: String,
-    is_down: bool,
-    is_elevator: bool,
-    duration_ms: i32,
-    timestamp: String,
-}
-
-fn get_connection() -> Result<Connection> {
-    Connection::open("splits.db")
-}
-
-async fn all_splits() -> String {
-    let conn = get_connection().unwrap();
-    let mut stmt = conn
-        .prepare("SELECT id, user, is_down, is_elevator, duration_ms, timestamp FROM splits")
-        .unwrap();
-    let splits = stmt
-        .query_map([], |row| {
-            Ok(Split {
-                id: row.get(0)?,
-                user: row.get(1)?,
-                is_down: row.get(2)?,
-                is_elevator: row.get(3)?,
-                duration_ms: row.get(4)?,
-                timestamp: row.get(5)?,
-            })
-        })
+async fn all_splits_internal(pool: &SqlitePool) -> String {
+    let rows = sqlx::query("SELECT id, user, is_down, is_elevator, duration_ms, timestamp FROM splits")
+        .fetch_all(pool)
+        .await
         .unwrap();
 
-    let result = splits
-        .map(|s| {
-            let split = s.unwrap();
-            let direction = if split.is_down { "down" } else { "up" };
-            let method = if split.is_elevator {
-                "elevator"
-            } else {
-                "stairs"
-            };
-            let seconds = split.duration_ms / 1000;
-            let remaining_ms = split.duration_ms % 1000;
+    let result = rows
+        .iter()
+        .map(|row| {
+            let id: i32 = row.get(0);
+            let user: String = row.get(1);
+            let is_down: bool = row.get(2);
+            let is_elevator: bool = row.get(3);
+            let duration_ms: i32 = row.get(4);
+            let timestamp: String = row.get(5);
+            
+            let direction = if is_down { "down" } else { "up" };
+            let method = if is_elevator { "elevator" } else { "stairs" };
+            let seconds = duration_ms / 1000;
+            let remaining_ms = duration_ms % 1000;
             let formatted_duration =
                 format!("{}m{}s{}ms", seconds / 60, seconds % 60, remaining_ms);
             format!(
                 "Entry {}: {} went {} the {} in {} on {}",
-                split.id, split.user, direction, method, formatted_duration, split.timestamp
+                id, user, direction, method, formatted_duration, timestamp
             )
         })
         .collect::<Vec<String>>()
         .join("\n");
     result
+}
+
+async fn all_splits(State(context): State<Arc<Mutex<AppContext>>>) -> String {
+    let ctx = context.lock().await;
+    all_splits_internal(&ctx.db_pool).await
 }
 
 #[derive(Deserialize)]
@@ -150,14 +139,21 @@ struct SplitData {
 }
 
 async fn new_split(State(context): State<Arc<Mutex<AppContext>>>, Json(data): Json<SplitData>) -> &'static str {
-    let conn = get_connection().unwrap();
-    conn.execute(
-        "INSERT INTO splits (user, is_down, is_elevator, duration_ms, timestamp) VALUES (?1, ?2, ?3, ?4, datetime('now'))",
-        (&data.user, data.is_down, data.is_elevator, data.duration_ms),
-    ).unwrap();
     let ctx = context.lock().await;
+    
+    sqlx::query(
+        "INSERT INTO splits (user, is_down, is_elevator, duration_ms, timestamp) VALUES (?1, ?2, ?3, ?4, datetime('now'))"
+    )
+    .bind(&data.user)
+    .bind(data.is_down)
+    .bind(data.is_elevator)
+    .bind(data.duration_ms)
+    .execute(&ctx.db_pool)
+    .await
+    .unwrap();
+    
     if let Some(discord_ctx) = &ctx.discord_ctx {
-        send_split(discord_ctx).await;
+        send_split(discord_ctx, &ctx.db_pool).await;
     }
     "Data inserted!"
 }
