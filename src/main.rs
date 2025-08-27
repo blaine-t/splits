@@ -1,6 +1,6 @@
 use axum::{Router, routing::get, routing::post};
 use splits::{AppContext, AppState, Result, Config};
-use splits::database::initialize_database;
+use splits::database::{create_sqlite_database_if_does_not_exist, initialize_database};
 use splits::discord::{Handler, create_discord_client};
 use splits::handlers::{all_splits, new_split};
 use sqlx::SqlitePool;
@@ -30,6 +30,11 @@ async fn run() -> Result<()> {
     debug!("Discord channel ID: {}", config.discord.channel_id);
     debug!("Database URL: {}", config.database.url);
 
+    // Create the DB if it doesn't exist already and db type is sqlite
+    if config.database.url.starts_with("sqlite:") {
+        create_sqlite_database_if_does_not_exist(&config.database.url)?;
+    }
+    
     // Initialize database pool with configuration
     let db_pool = SqlitePool::connect(&config.database.url).await?;
     

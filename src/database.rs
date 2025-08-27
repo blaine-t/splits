@@ -2,6 +2,25 @@ use crate::error::Result;
 use crate::models::{Split, SplitData};
 use crate::validation::DurationValidator;
 use sqlx::{SqlitePool, Row};
+use tracing::{debug, warn};
+
+/// Create a sqlite database if the given file name doesn't exist
+pub fn create_sqlite_database_if_does_not_exist(url: &String) -> Result<()> {
+    // Create database parent directory if it doesn't exist
+    let db_path = url.strip_prefix("sqlite:").unwrap_or(&url);
+    if let Some(parent) = std::path::Path::new(db_path).parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    // Create the database file itself
+    if !std::path::Path::new(db_path).exists() {
+        std::fs::File::create(db_path)?;
+        warn!("Creating database at {db_path} as it didn't already exist!")
+    } else {
+        debug!("Database already exists at {db_path}");
+    }
+
+    Ok(())
+}
 
 /// Initialize the database and create tables if they don't exist
 pub async fn initialize_database(pool: &SqlitePool) -> Result<()> {
@@ -17,7 +36,7 @@ pub async fn initialize_database(pool: &SqlitePool) -> Result<()> {
     )
     .execute(pool)
     .await?;
-    
+    debug!("Initialized database");
     Ok(())
 }
 
