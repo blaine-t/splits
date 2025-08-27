@@ -1,5 +1,6 @@
 use crate::error::Result;
 use crate::models::{Split, SplitData};
+use crate::validation::DurationValidator;
 use sqlx::{SqlitePool, Row};
 
 /// Initialize the database and create tables if they don't exist
@@ -43,6 +44,7 @@ pub async fn get_all_splits(pool: &SqlitePool) -> Result<Vec<Split>> {
 
 /// Insert a new split into the database
 pub async fn insert_split(pool: &SqlitePool, data: &SplitData) -> Result<()> {
+    
     sqlx::query(
         "INSERT INTO splits (user, is_down, is_elevator, duration_ms, timestamp) VALUES (?1, ?2, ?3, ?4, datetime('now'))"
     )
@@ -63,10 +65,7 @@ pub fn format_splits(splits: &[Split]) -> String {
         .map(|split| {
             let direction = if split.is_down { "down" } else { "up" };
             let method = if split.is_elevator { "elevator" } else { "stairs" };
-            let seconds = split.duration_ms / 1000;
-            let remaining_ms = split.duration_ms % 1000;
-            let formatted_duration =
-                format!("{}m{}s{}ms", seconds / 60, seconds % 60, remaining_ms);
+            let formatted_duration = DurationValidator::format_duration(split.duration_ms);
             format!(
                 "Entry {}: {} went {} the {} in {} on {}",
                 split.id, split.user, direction, method, formatted_duration, split.timestamp

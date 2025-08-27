@@ -2,6 +2,8 @@ use crate::database::{get_all_splits, format_splits, insert_split};
 use crate::discord::send_split_to_discord;
 use crate::models::{AppState, SplitData};
 use axum::extract::State;
+use axum::http::StatusCode;
+use axum::response::{Response, IntoResponse};
 use axum::Json;
 
 /// HTTP handler to get all splits
@@ -16,23 +18,42 @@ pub async fn all_splits(State(app_state): State<AppState>) -> String {
     }
 }
 
-/// HTTP handler to create a new split
+/// HTTP handler to create a new split with validation
 pub async fn new_split(
     State(app_state): State<AppState>, 
     Json(data): Json<SplitData>
-) -> &'static str {
+) -> Response {
+    // Validate the input data using configuration
+    if let Err(validation_error) = data.validate(&app_state.config.validation) {
+        eprintln!("Validation error: {}", validation_error);
+        return (
+            StatusCode::BAD_REQUEST,
+            format!("Validation failed: {}", validation_error)
+        ).into_response();
+    }
+
     let ctx = app_state.context.lock().await;
     
     match insert_split(&ctx.db_pool, &data).await {
         Ok(_) => {
+            println!("Split inserted successfully for user: {}", data.user);
+            println!("Duration: {}", data.formatted_duration());
+            
             if let Some(discord_ctx) = &ctx.discord_ctx {
                 send_split_to_discord(discord_ctx, &ctx.db_pool, &app_state.config).await;
             }
-            "Data inserted!"
+            
+            (
+                StatusCode::CREATED,
+                "Data inserted successfully!"
+            ).into_response()
         }
         Err(e) => {
             eprintln!("Error inserting split: {}", e);
-            "Error inserting data"
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error inserting data"
+            ).into_response()
         }
     }
 }

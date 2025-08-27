@@ -9,6 +9,7 @@ pub struct Config {
     pub discord: DiscordConfig,
     pub database: DatabaseConfig,
     pub server: ServerConfig,
+    pub validation: ValidationConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -29,12 +30,27 @@ pub struct ServerConfig {
     pub static_dir: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ValidationConfig {
+    /// Maximum username length (-1 for no limit)
+    pub max_username_length: i32,
+    /// Whitelist of allowed usernames (if empty, uses blacklist)
+    pub username_whitelist: Vec<String>,
+    /// Blacklist of prohibited usernames (if empty and whitelist empty, allows any)
+    pub username_blacklist: Vec<String>,
+    /// Maximum duration in milliseconds
+    pub max_duration_ms: i32,
+    /// Minimum duration in milliseconds
+    pub min_duration_ms: i32,
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
             discord: DiscordConfig::default(),
             database: DatabaseConfig::default(),
             server: ServerConfig::default(),
+            validation: ValidationConfig::default(),
         }
     }
 }
@@ -62,6 +78,18 @@ impl Default for ServerConfig {
             host: "0.0.0.0".to_string(),
             port: 7758,
             static_dir: "static".to_string(),
+        }
+    }
+}
+
+impl Default for ValidationConfig {
+    fn default() -> Self {
+        Self {
+            max_username_length: -1, // No limit
+            username_whitelist: vec![],
+            username_blacklist: vec![],
+            max_duration_ms: 24 * 60 * 60 * 1000, // 24 hours
+            min_duration_ms: 100, // 100ms
         }
     }
 }
@@ -151,5 +179,10 @@ mod tests {
         assert_eq!(parsed_config.server.host, default_config.server.host);
         assert_eq!(parsed_config.server.port, default_config.server.port);
         assert_eq!(parsed_config.server.static_dir, default_config.server.static_dir);
+        assert_eq!(parsed_config.validation.max_username_length, default_config.validation.max_username_length);
+        assert_eq!(parsed_config.validation.username_whitelist, default_config.validation.username_whitelist);
+        assert_eq!(parsed_config.validation.username_blacklist, default_config.validation.username_blacklist);
+        assert_eq!(parsed_config.validation.max_duration_ms, default_config.validation.max_duration_ms);
+        assert_eq!(parsed_config.validation.min_duration_ms, default_config.validation.min_duration_ms);
     }
 }

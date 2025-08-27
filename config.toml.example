@@ -9,3 +9,10 @@ url = "sqlite:splits.db"
 host = "0.0.0.0"
 port = 7758
 static_dir = "static"
+
+[validation]
+max_username_length = -1
+username_whitelist = []
+username_blacklist = []
+max_duration_ms = 86400000
+min_duration_ms = 100
