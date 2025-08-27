@@ -1,0 +1,11 @@
+[discord]
+token = "YOUR_TOKEN_HERE"
+channel_id = 1234567890123456789
+
+[database]
+url = "sqlite:splits.db"
+
+[server]
+host = "0.0.0.0"
+port = 7758
+static_dir = "static"

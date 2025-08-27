@@ -1,3 +1,4 @@
+use crate::config::Config;
 use crate::database::{get_all_splits, format_splits};
 use crate::models::SharedAppContext;
 use serenity::async_trait;
@@ -6,8 +7,6 @@ use serenity::model::gateway::Ready;
 use serenity::model::id::ChannelId;
 use serenity::prelude::*;
 use sqlx::SqlitePool;
-
-const DISCORD_CHANNEL_ID: u64 = 1410126283555344396;
 
 pub struct Handler {
     pub context: SharedAppContext,
@@ -23,12 +22,12 @@ impl EventHandler for Handler {
 }
 
 /// Send splits information to Discord
-pub async fn send_split_to_discord(ctx: &Context, pool: &SqlitePool) {
+pub async fn send_split_to_discord(ctx: &Context, pool: &SqlitePool, config: &Config) {
     match get_all_splits(pool).await {
         Ok(splits) => {
             let content = format_splits(&splits);
             let builder = CreateMessage::new().content(content);
-            let message = ChannelId::new(DISCORD_CHANNEL_ID)
+            let message = ChannelId::new(config.discord.channel_id)
                 .send_message(ctx, builder)
                 .await;
             if let Err(why) = message {
@@ -42,9 +41,9 @@ pub async fn send_split_to_discord(ctx: &Context, pool: &SqlitePool) {
 }
 
 /// Create and configure Discord client
-pub async fn create_discord_client(token: &str, handler: Handler) -> Result<Client, serenity::Error> {
+pub async fn create_discord_client(config: &Config, handler: Handler) -> Result<Client, serenity::Error> {
     let intents = GatewayIntents::GUILDS;
-    Client::builder(token, intents)
+    Client::builder(&config.discord.token, intents)
         .event_handler(handler)
         .await
 }

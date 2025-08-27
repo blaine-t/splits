@@ -4,9 +4,11 @@
 
 pub mod error;
 pub mod models;
+pub mod config;
 pub mod database;
 pub mod discord;
 pub mod handlers;
 
 pub use error::{AppError, Result};
-pub use models::{Split, SplitData, AppContext};
+pub use models::{Split, SplitData, AppContext, AppState};
+pub use config::Config;

@@ -3,6 +3,7 @@ use serenity::prelude::Context;
 use sqlx::SqlitePool;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use crate::config::Config;
 
 #[derive(Debug)]
 pub struct Split {
@@ -26,6 +27,12 @@ pub struct SplitData {
 pub struct AppContext {
     pub discord_ctx: Option<Context>,
     pub db_pool: SqlitePool,
+}
+
+#[derive(Clone)]
+pub struct AppState {
+    pub context: Arc<Mutex<AppContext>>,
+    pub config: Config,
 }
 
 pub type SharedAppContext = Arc<Mutex<AppContext>>;
