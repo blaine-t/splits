@@ -9,7 +9,7 @@ serde = { version = "1.0.219", default-features = false, features = ["derive"] }
 serenity = {version = "0.12.4", default-features = false, features = ["builder", "client", "gateway", "model", "rustls_backend"] }
 sqlx = { version = "0.8.6", default-features = false, features = ["sqlite", "runtime-tokio-rustls"] }
 thiserror = { version = "2.0.16", default-features = false }
-tokio = { version = "1.47.1", default-features = false, features = ["macros", "net", "rt-multi-thread"] }
+tokio = { version = "1.47.1", default-features = false, features = ["macros", "net", "rt-multi-thread", "signal"] }
 toml = { version = "0.9.5", default-features = false, features = ["display", "parse", "serde"] }
 tower-http = { version = "0.6.6", default-features = false, features = ["fs"] }
 tracing = {version = "0.1.41", default-features = false }

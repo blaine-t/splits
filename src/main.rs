@@ -1,8 +1,9 @@
 use axum::{Router, routing::get, routing::post};
-use splits::{AppContext, AppState, Result, Config};
 use splits::database::{create_sqlite_database_if_does_not_exist, initialize_database};
 use splits::discord::{Handler, create_discord_client};
 use splits::handlers::{all_splits, new_split};
+use splits::signals::shutdown_signal;
+use splits::{AppContext, AppState, Config, Result};
 use sqlx::SqlitePool;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -13,7 +14,7 @@ use tracing::{debug, error, info};
 async fn main() {
     // Initialize tracing
     tracing_subscriber::fmt::init();
-    
+
     if let Err(e) = run().await {
         error!("Application error: {}", e);
         std::process::exit(1);
@@ -34,14 +35,14 @@ async fn run() -> Result<()> {
     if config.database.url.starts_with("sqlite:") {
         create_sqlite_database_if_does_not_exist(&config.database.url)?;
     }
-    
+
     // Initialize database pool with configuration
     let db_pool = SqlitePool::connect(&config.database.url).await?;
-    
+
     // Initialize database tables
     initialize_database(&db_pool).await?;
 
-    let shared_context = Arc::new(Mutex::new(AppContext { 
+    let shared_context = Arc::new(Mutex::new(AppContext {
         discord_ctx: None,
         db_pool: db_pool.clone(),
     }));
@@ -51,7 +52,9 @@ async fn run() -> Result<()> {
         config: config.clone(),
     };
 
-    let handler = Handler { context: shared_context.clone() };
+    let handler = Handler {
+        context: shared_context.clone(),
+    };
     let mut client = create_discord_client(&config, handler).await?;
 
     // Run Discord client in a separate thread
@@ -69,7 +72,8 @@ async fn run() -> Result<()> {
 
     let listener = tokio::net::TcpListener::bind(&config.server_address()).await?;
     info!("listening on {}", listener.local_addr()?);
-    axum::serve(listener, app).await?;
-    
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
     Ok(())
 }
