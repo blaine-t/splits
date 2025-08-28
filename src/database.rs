@@ -89,16 +89,30 @@ pub async fn get_most_recent_split(pool: &SqlitePool) -> Result<Option<Split>> {
 /// A WR is when no other entry exists with the same is_down, is_elevator, and is_encumbered status
 /// with a better (lower) duration
 pub async fn is_world_record(pool: &SqlitePool, split: &Split) -> Result<bool> {
-    let count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM splits 
-         WHERE is_down = ?1 AND is_elevator = ?2 AND is_encumbered = ?3 AND duration_ms < ?4"
-    )
-    .bind(split.is_down)
-    .bind(split.is_elevator)
-    .bind(split.is_encumbered)
-    .bind(split.duration_ms)
-    .fetch_one(pool)
-    .await?;
+    let count: i64 = if split.is_elevator {
+        // For elevator splits, ignore is_encumbered (it's always None)
+        sqlx::query_scalar(
+            "SELECT COUNT(*) FROM splits 
+             WHERE is_down = ?1 AND is_elevator = ?2 AND duration_ms < ?3"
+        )
+        .bind(split.is_down)
+        .bind(split.is_elevator)
+        .bind(split.duration_ms)
+        .fetch_one(pool)
+        .await?
+    } else {
+        // For stairs splits, include is_encumbered in comparison
+        sqlx::query_scalar(
+            "SELECT COUNT(*) FROM splits 
+             WHERE is_down = ?1 AND is_elevator = ?2 AND is_encumbered = ?3 AND duration_ms < ?4"
+        )
+        .bind(split.is_down)
+        .bind(split.is_elevator)
+        .bind(split.is_encumbered)
+        .bind(split.duration_ms)
+        .fetch_one(pool)
+        .await?
+    };
 
     Ok(count == 0)
 }
@@ -182,8 +196,8 @@ pub fn format_single_split(split: &Split, is_wr: bool) -> String {
     };
     
     let content = format!(
-        "{} went {} the {}{} in {} on {}",
-        split.user, direction, method, encumbered_text, formatted_duration, split.created_at
+        "{} went {} the {}{} in {}",
+        split.user, direction, method, encumbered_text, formatted_duration
     );
     
     if is_wr {
