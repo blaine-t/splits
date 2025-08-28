@@ -1,75 +1,596 @@
 <!DOCTYPE html>
 <html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Splits Timer</title>
-    <link rel="stylesheet" href="style.css">
-</head>
 
-<body>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        overflow: hidden;
+      }
+
+      body {
+        font-family: Arial, sans-serif;
+        height: 100vh;
+        background: rgb(2, 0, 100);
+        background-image: linear-gradient(
+          -45deg,
+          rgba(2, 0, 36, 0.77) 0%,
+          rgb(36, 36, 122) 35%,
+          rgba(45, 133, 150, 0.92) 100%
+        );
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .container {
+        width: 100%;
+        height: 100%;
+        position: relative;
+      }
+
+      .screen {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        transition: transform 0.5s ease-in-out, opacity 0.5s ease-in-out;
+        transform: translateX(100%);
+        opacity: 0;
+      }
+
+      .screen.active {
+        transform: translateX(0);
+        opacity: 1;
+      }
+
+      .screen.prev {
+        transform: translateX(-100%);
+        opacity: 0;
+      }
+
+      .circle-button {
+        width: 200px;
+        height: 200px;
+        border-radius: 50%;
+        border: none;
+        font-size: 32px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: transform 0.2s ease;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+      }
+
+      .circle-button:hover {
+        transform: scale(1.05);
+      }
+
+      .circle-button:active {
+        transform: scale(0.95);
+      }
+
+      .start-button {
+        background: #3c9e00;
+        color: white;
+      }
+
+      .stop-button {
+        background: #9e0006;
+        color: white;
+      }
+
+      .timer-display {
+        font-size: 64px;
+        font-weight: bold;
+        color: white;
+        margin-bottom: 40px;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        font-family: "Courier New", monospace;
+      }
+
+      .form-container {
+        background: white;
+        padding: 40px;
+        border-radius: 20px;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+        max-width: 400px;
+        width: 90%;
+      }
+
+      .form-title {
+        font-size: 24px;
+        margin-bottom: 20px;
+        text-align: center;
+        color: #333;
+      }
+
+      .form-group {
+        margin-bottom: 20px;
+      }
+
+      .form-input {
+        width: 100%;
+        padding: 15px;
+        font-size: 18px;
+        border: 2px solid #ddd;
+        border-radius: 10px;
+        outline: none;
+        transition: border-color 0.3s ease;
+      }
+
+      .form-input:focus {
+        border-color: #667eea;
+      }
+
+      .form-button {
+        width: 100%;
+        padding: 15px;
+        font-size: 18px;
+        font-weight: bold;
+        border: none;
+        border-radius: 10px;
+        background: #333;
+        color: white;
+        cursor: pointer;
+        transition: background 0.3s ease;
+      }
+
+      .form-button:hover {
+        background: #5a6fd8;
+      }
+
+      .form-button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+
+      .error-message {
+        color: #ff6b6b;
+        font-size: 18px;
+        text-align: center;
+        margin-top: 10px;
+        padding: 10px;
+        background: rgba(255, 107, 107, 0.1);
+        border-radius: 5px;
+      }
+
+      .validation-error {
+        border-color: #ff6b6b !important;
+        background: rgba(255, 107, 107, 0.05);
+      }
+
+      .choice-container {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        align-items: center;
+      }
+
+      .choice-button {
+        padding: 20px 40px;
+        font-size: 24px;
+        font-weight: bold;
+        border: none;
+        border-radius: 15px;
+        background: white;
+        color: #333;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        min-width: 200px;
+      }
+
+      .choice-button:hover {
+        background: #667eea;
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+      }
+
+      .question-title {
+        font-size: 32px;
+        color: white;
+        text-align: center;
+        margin-bottom: 40px;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+      }
+
+      .loading-screen {
+        text-align: center;
+        color: white;
+      }
+
+      .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 5px solid rgba(255, 255, 255, 0.3);
+        border-top: 5px solid white;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 20px auto;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .success-message {
+        font-size: 24px;
+        color: white;
+        text-align: center;
+        margin-top: 20px;
+      }
+
+      @media (max-width: 768px) {
+        .choice-button {
+          min-width: 150px;
+          padding: 15px 30px;
+          font-size: 20px;
+        }
+
+        .circle-button {
+          width: 150px;
+          height: 150px;
+          font-size: 24px;
+        }
+
+        .timer-display {
+          font-size: 48px;
+        }
+
+        .form-container {
+          padding: 20px;
+          margin: 10px;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
     <div class="container">
-        <!-- Start Screen -->
-        <div id="start-screen" class="screen">
-            <div class="timer-display">Splits</div>
-            <button class="circle-button start-button" onclick="startTimer()">START</button>
-        </div>
+      <!-- Start Screen -->
+      <div id="start-screen" class="screen">
+        <div class="timer-display">Splits</div>
+        <button class="circle-button start-button" onclick="startTimer()">
+          START
+        </button>
+      </div>
 
-        <!-- Timer Screen -->
-        <div id="timer-screen" class="screen">
-            <div id="timer-display" class="timer-display">00:00:000</div>
-            <button class="circle-button stop-button" onclick="stopTimer()">STOP</button>
-        </div>
+      <!-- Timer Screen -->
+      <div id="timer-screen" class="screen">
+        <div id="timer-display" class="timer-display">00:00:000</div>
+        <button class="circle-button stop-button" onclick="stopTimer()">
+          STOP
+        </button>
+      </div>
 
-        <!-- Username Confirmation Screen -->
-        <div id="username-screen" class="screen">
-            <div class="form-container">
-                <h2 class="form-title">Confirm Your Name</h2>
-                <div class="form-group">
-                    <input type="text" id="username-input" class="form-input" placeholder="Enter your username">
-                </div>
-                <button class="form-button" onclick="confirmUsername()">Continue</button>
-            </div>
+      <!-- Username Confirmation Screen -->
+      <div id="username-screen" class="screen">
+        <div class="form-container">
+          <h2 class="form-title">Confirm Your Name</h2>
+          <div class="form-group">
+            <input
+              type="text"
+              id="username-input"
+              class="form-input"
+              placeholder="Enter your username"
+            />
+          </div>
+          <button class="form-button" onclick="confirmUsername()">
+            Continue
+          </button>
         </div>
+      </div>
 
-        <!-- Direction Screen -->
-        <div id="direction-screen" class="screen">
-            <h2 class="question-title">Were you going...</h2>
-            <div class="choice-container">
-                <button class="choice-button" onclick="selectDirection('up')">UP</button>
-                <button class="choice-button" onclick="selectDirection('down')">DOWN</button>
-            </div>
+      <!-- Direction Screen -->
+      <div id="direction-screen" class="screen">
+        <h2 class="question-title">Were you going...</h2>
+        <div class="choice-container">
+          <button class="choice-button" onclick="selectDirection('up')">
+            UP
+          </button>
+          <button class="choice-button" onclick="selectDirection('down')">
+            DOWN
+          </button>
         </div>
+      </div>
 
-        <!-- Method Screen -->
-        <div id="method-screen" class="screen">
-            <h2 class="question-title">How did you travel?</h2>
-            <div class="choice-container">
-                <button class="choice-button" onclick="selectMethod('elevator')">ELEVATOR</button>
-                <button class="choice-button" onclick="selectMethod('stairs')">STAIRS</button>
-            </div>
+      <!-- Method Screen -->
+      <div id="method-screen" class="screen">
+        <h2 class="question-title">How did you travel?</h2>
+        <div class="choice-container">
+          <button class="choice-button" onclick="selectMethod('elevator')">
+            ELEVATOR
+          </button>
+          <button class="choice-button" onclick="selectMethod('stairs')">
+            STAIRS
+          </button>
         </div>
+      </div>
 
-        <!-- Carrying Items Screen (only for stairs) -->
-        <div id="carrying-screen" class="screen">
-            <h2 class="question-title">Were you encumbered?</h2>
-            <div class="choice-container">
-                <button class="choice-button" onclick="selectCarrying(true)">YES</button>
-                <button class="choice-button" onclick="selectCarrying(false)">NO</button>
-            </div>
+      <!-- Carrying Items Screen (only for stairs) -->
+      <div id="carrying-screen" class="screen">
+        <h2 class="question-title">Were you encumbered?</h2>
+        <div class="choice-container">
+          <button class="choice-button" onclick="selectCarrying(true)">
+            YES
+          </button>
+          <button class="choice-button" onclick="selectCarrying(false)">
+            NO
+          </button>
         </div>
+      </div>
 
-        <!-- Loading/Results Screen -->
-        <div id="loading-screen" class="screen">
-            <div id="loading-content" class="loading-screen">
-                <div class="loading-spinner"></div>
-                <h2>Recording Split...</h2>
-            </div>
+      <!-- Loading/Results Screen -->
+      <div id="loading-screen" class="screen">
+        <div id="loading-content" class="loading-screen">
+          <div class="loading-spinner"></div>
+          <h2>Recording Split...</h2>
         </div>
+      </div>
     </div>
 
-    <script src="script.js"></script>
-</body>
+    <script>
+      // Application state
+      let startTime = 0;
+      let timerInterval = null;
+      let isRunning = false;
+      let currentScreen = 0;
+      let duration = 0;
+      let userData = {
+        username: "",
+        isDown: null,
+        isElevator: null,
+        isEncumbered: null,
+      };
 
+      // Screen management
+      const screens = [
+        "start-screen",
+        "timer-screen",
+        "username-screen",
+        "direction-screen",
+        "method-screen",
+        "carrying-screen",
+        "loading-screen",
+      ];
+
+      // Initialize app
+      document.addEventListener("DOMContentLoaded", function () {
+        // Load username from localStorage
+        const savedUsername = localStorage.getItem("username");
+        if (savedUsername) {
+          userData.username = savedUsername;
+          document.getElementById("username-input").value = savedUsername;
+        }
+
+        // Add keyboard event listeners
+        document.addEventListener("keydown", handleKeyPress);
+
+        // Show first screen
+        showScreen(0);
+      });
+
+      function handleKeyPress(event) {
+        if (event.key === "Enter") {
+          const currentScreenId = screens[currentScreen];
+
+          if (currentScreenId === "username-screen") {
+            confirmUsername();
+          }
+        }
+
+        if (event.key === " " || event.key === "Spacebar") {
+          event.preventDefault();
+
+          if (currentScreen === 0) {
+            startTimer();
+          } else if (currentScreen === 1 && isRunning) {
+            stopTimer();
+          }
+        }
+      }
+
+      function showScreen(screenIndex) {
+        // Hide all screens
+        screens.forEach((screenId, index) => {
+          const screen = document.getElementById(screenId);
+          if (screen) {
+            screen.classList.remove("active", "prev");
+            if (index < screenIndex) {
+              screen.classList.add("prev");
+            }
+          }
+        });
+
+        // Show current screen
+        const currentScreenElement = document.getElementById(
+          screens[screenIndex]
+        );
+        if (currentScreenElement) {
+          setTimeout(() => {
+            currentScreenElement.classList.add("active");
+          }, 50);
+        }
+
+        currentScreen = screenIndex;
+      }
+
+      function nextScreen() {
+        if (currentScreen < screens.length - 1) {
+          showScreen(currentScreen + 1);
+        }
+      }
+
+      // Timer functions
+      function startTimer() {
+        if (isRunning) return;
+
+        startTime = Date.now();
+        isRunning = true;
+
+        function animate() {
+          if (isRunning) {
+            updateTimer();
+            requestAnimationFrame(animate);
+          }
+        }
+        animate();
+
+        nextScreen();
+      }
+
+      function stopTimer() {
+        if (!isRunning) return;
+
+        const endTime = Date.now();
+        duration = endTime - startTime;
+
+        isRunning = false;
+
+        nextScreen();
+      }
+
+      function updateTimer() {
+        const elapsed = Date.now() - startTime;
+        const minutes = Math.floor(elapsed / 60000);
+        const seconds = Math.floor((elapsed % 60000) / 1000);
+        const milliseconds = elapsed % 1000;
+
+        document.getElementById("timer-display").textContent = `${minutes
+          .toString()
+          .padStart(2, "0")}:${seconds
+          .toString()
+          .padStart(2, "0")}:${milliseconds.toString().padStart(3, "0")}`;
+      }
+
+      // Form handlers
+      function confirmUsername() {
+        const username = document.getElementById("username-input").value.trim();
+        if (!username) {
+          alert("Please enter a username");
+          return;
+        }
+
+        userData.username = username;
+        localStorage.setItem("username", username);
+        nextScreen();
+      }
+
+      function selectDirection(direction) {
+        userData.isDown = direction === "down";
+        nextScreen();
+      }
+
+      function selectMethod(method) {
+        userData.isElevator = method === "elevator";
+
+        if (method === "stairs") {
+          nextScreen(); // Go to carrying screen
+        } else {
+          userData.isEncumbered = null;
+          submitSplit(); // Skip carrying screen for elevator
+        }
+      }
+
+      function selectCarrying(carrying) {
+        userData.isEncumbered = carrying;
+        submitSplit();
+      }
+
+      async function submitSplit() {
+        showScreen(6); // Show loading screen
+
+        const splitData = {
+          user: userData.username,
+          is_down: userData.isDown,
+          is_elevator: userData.isElevator,
+          duration_ms: duration,
+        };
+
+        if (userData.isEncumbered !== null && !userData.isElevator) {
+          splitData.is_encumbered = userData.isEncumbered;
+        }
+
+        try {
+          const response = await fetch("api/v0/split/new", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(splitData),
+          });
+
+          if (response.ok) {
+            showSuccessMessage();
+          } else {
+            const errorText = await response.text();
+            showErrorMessage(`Failed to record split: ${errorText}`);
+          }
+        } catch (error) {
+          console.error("Error:", error);
+          showErrorMessage(`Network error: ${error.message}`);
+        }
+      }
+
+      function showSuccessMessage() {
+        document.getElementById("loading-content").innerHTML = `
+        <h2>Success!</h2>
+        <p class="success-message">Split recorded successfully!</p>
+        <button class="form-button" onclick="resetApp()" style="margin-top: 20px;">Start New Split</button>
+    `;
+      }
+
+      function showErrorMessage(message) {
+        document.getElementById("loading-content").innerHTML = `
+        <h2>Error</h2>
+        <p class="success-message">${message}</p>
+        <button class="form-button" onclick="resetApp()" style="margin-top: 20px;">Try Again</button>
+    `;
+      }
+
+      function resetApp() {
+        // Reset all state
+        startTime = 0;
+        duration = 0;
+        isRunning = false;
+        userData.isDown = null;
+        userData.isElevator = null;
+        userData.isEncumbered = null;
+
+        if (timerInterval) {
+          clearInterval(timerInterval);
+          timerInterval = null;
+        }
+
+        // Reset timer display
+        document.getElementById("timer-display").textContent = "00:00:000";
+
+        // Reset loading content
+        document.getElementById("loading-content").innerHTML = `
+        <div class="loading-spinner"></div>
+        <h2>Recording Split...</h2>
+    `;
+
+        // Go back to start screen
+        showScreen(0);
+      }
+    </script>
+  </body>
 </html>
