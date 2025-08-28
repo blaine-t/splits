@@ -58,6 +58,8 @@ pub async fn send_split_to_discord(ctx: &Context, pool: &SqlitePool, config: &Co
 pub async fn create_discord_client(config: &Config, handler: Handler) -> Result<serenity::Client, Box<dyn std::error::Error + Send + Sync>> {
     let intents = GatewayIntents::GUILDS | GatewayIntents::GUILD_MESSAGES;
     
+    let context_clone = handler.context.clone();
+    
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
             commands: commands(),
@@ -71,13 +73,14 @@ pub async fn create_discord_client(config: &Config, handler: Handler) -> Result<
                 info!("Bot is ready! Registering slash commands...");
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
                 Ok(Data {
-                    db_pool: handler.context.lock().await.db_pool.clone(),
+                    db_pool: context_clone.lock().await.db_pool.clone(),
                 })
             })
         })
         .build();
 
     let client = serenity::ClientBuilder::new(&config.discord.token, intents)
+        .event_handler(handler)
         .framework(framework)
         .await?;
 
