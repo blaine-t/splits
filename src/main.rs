@@ -55,7 +55,8 @@ async fn run() -> Result<()> {
     let handler = Handler {
         context: shared_context.clone(),
     };
-    let mut client = create_discord_client(&config, handler).await?;
+    let mut client = create_discord_client(&config, handler).await
+        .map_err(|e| splits::AppError::Other(format!("Failed to create Discord client: {}", e)))?;
 
     // Run Discord client in a separate thread
     tokio::spawn(async move {

@@ -10,6 +10,7 @@ pub mod discord;
 pub mod handlers;
 pub mod signals;
 pub mod validation;
+pub mod commands;
 
 pub use error::{AppError, Result};
 pub use models::{Split, SplitData, AppContext, AppState};

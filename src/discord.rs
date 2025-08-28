@@ -1,6 +1,8 @@
 use crate::config::Config;
 use crate::database::{get_most_recent_split, format_single_split, is_world_record};
 use crate::models::SharedAppContext;
+use crate::commands::{Data, Error, commands};
+use poise::serenity_prelude as serenity;
 use serenity::async_trait;
 use serenity::builder::CreateMessage;
 use serenity::model::gateway::Ready;
@@ -52,10 +54,47 @@ pub async fn send_split_to_discord(ctx: &Context, pool: &SqlitePool, config: &Co
     }
 }
 
-/// Create and configure Discord client
-pub async fn create_discord_client(config: &Config, handler: Handler) -> Result<Client, serenity::Error> {
-    let intents = GatewayIntents::GUILDS;
-    Client::builder(&config.discord.token, intents)
-        .event_handler(handler)
-        .await
+/// Create and configure Discord client with poise framework
+pub async fn create_discord_client(config: &Config, handler: Handler) -> Result<serenity::Client, Box<dyn std::error::Error + Send + Sync>> {
+    let intents = GatewayIntents::GUILDS | GatewayIntents::GUILD_MESSAGES;
+    
+    let framework = poise::Framework::builder()
+        .options(poise::FrameworkOptions {
+            commands: commands(),
+            event_handler: |ctx, event, framework, data| {
+                Box::pin(event_handler(ctx, event, framework, data))
+            },
+            ..Default::default()
+        })
+        .setup(move |ctx, _ready, framework| {
+            Box::pin(async move {
+                info!("Bot is ready! Registering slash commands...");
+                poise::builtins::register_globally(ctx, &framework.options().commands).await?;
+                Ok(Data {
+                    db_pool: handler.context.lock().await.db_pool.clone(),
+                })
+            })
+        })
+        .build();
+
+    let client = serenity::ClientBuilder::new(&config.discord.token, intents)
+        .framework(framework)
+        .await?;
+
+    Ok(client)
+}
+
+async fn event_handler(
+    _ctx: &serenity::Context,
+    event: &serenity::FullEvent,
+    _framework: poise::FrameworkContext<'_, Data, Error>,
+    _data: &Data,
+) -> Result<(), Error> {
+    match event {
+        serenity::FullEvent::Ready { data_about_bot } => {
+            info!("{} bot is connected to Discord!", data_about_bot.user.name);
+        }
+        _ => {}
+    }
+    Ok(())
 }

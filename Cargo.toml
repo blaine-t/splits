@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 axum = { version = "0.8.4", default-features = false, features = ["http1", "json", "tokio"] }
+poise = { version = "0.6.1", default-features = false }
 serde = { version = "1.0.219", default-features = false, features = ["derive"] }
 serenity = {version = "0.12.4", default-features = false, features = ["builder", "client", "gateway", "model", "rustls_backend"] }
 sqlx = { version = "0.8.6", default-features = false, features = ["sqlite", "runtime-tokio-rustls"] }

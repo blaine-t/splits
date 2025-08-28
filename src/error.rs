@@ -12,6 +12,8 @@ pub enum AppError {
     Network(#[from] std::io::Error),
     #[error("Duplicate entry error")]
     DuplicateEntry,
+    #[error("Other error: {0}")]
+    Other(String),
 }
 
 pub type Result<T> = std::result::Result<T, AppError>;

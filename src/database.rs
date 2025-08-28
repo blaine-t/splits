@@ -206,3 +206,91 @@ pub fn format_single_split(split: &Split, is_wr: bool) -> String {
         content
     }
 }
+
+/// Get the world record (best time) for each category
+pub async fn get_world_records(pool: &SqlitePool) -> Result<Vec<Split>> {
+    let mut world_records = Vec::new();
+
+    // Define all possible categories
+    let categories = [
+        // Elevator categories (is_encumbered is ignored for elevators)
+        (true, true, None),   // down elevator
+        (false, true, None),  // up elevator
+        
+        // Stairs categories
+        (true, false, Some(true)),   // down stairs encumbered
+        (true, false, Some(false)),  // down stairs not encumbered
+        (false, false, Some(true)),  // up stairs encumbered
+        (false, false, Some(false)), // up stairs not encumbered
+    ];
+
+    for (is_down, is_elevator, is_encumbered) in categories {
+        let row = if is_elevator {
+            // For elevator splits, ignore is_encumbered
+            sqlx::query("SELECT id, user, is_down, is_elevator, is_encumbered, duration_ms, created_at FROM splits 
+                        WHERE is_down = ?1 AND is_elevator = ?2 
+                        ORDER BY duration_ms ASC LIMIT 1")
+                .bind(is_down)
+                .bind(is_elevator)
+                .fetch_optional(pool)
+                .await?
+        } else {
+            // For stairs splits, include is_encumbered
+            sqlx::query("SELECT id, user, is_down, is_elevator, is_encumbered, duration_ms, created_at FROM splits 
+                        WHERE is_down = ?1 AND is_elevator = ?2 AND is_encumbered = ?3 
+                        ORDER BY duration_ms ASC LIMIT 1")
+                .bind(is_down)
+                .bind(is_elevator)
+                .bind(is_encumbered)
+                .fetch_optional(pool)
+                .await?
+        };
+
+        if let Some(row) = row {
+            world_records.push(Split {
+                id: row.get(0),
+                user: row.get(1),
+                is_down: row.get(2),
+                is_elevator: row.get(3),
+                is_encumbered: row.get(4),
+                duration_ms: row.get(5),
+                created_at: row.get(6),
+            });
+        }
+    }
+
+    Ok(world_records)
+}
+
+/// Format world records for display
+pub fn format_world_records(world_records: &[Split]) -> String {
+    if world_records.is_empty() {
+        return "No world records found.".to_string();
+    }
+
+    let mut formatted = String::from("**World Records Board:**\n");
+    
+    for split in world_records {
+        let direction = if split.is_down { "Down" } else { "Up" };
+        let method = if split.is_elevator { "Elevator" } else { "Stairs" };
+        let formatted_duration = DurationValidator::format_duration(split.duration_ms);
+        
+        let category = if split.is_elevator {
+            format!("{} {}", direction, method)
+        } else {
+            let encumbered_text = match split.is_encumbered {
+                Some(true) => " (Encumbered)",
+                Some(false) => " (No Items)",
+                None => "",
+            };
+            format!("{} {}{}", direction, method, encumbered_text)
+        };
+        
+        formatted.push_str(&format!(
+            "**{}**: {} - {} ({})\n",
+            category, split.user, formatted_duration, split.created_at
+        ));
+    }
+
+    formatted
+}
