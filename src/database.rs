@@ -31,18 +31,20 @@ pub async fn initialize_database(pool: &SqlitePool) -> Result<()> {
             is_down BOOLEAN NOT NULL,
             is_elevator BOOLEAN NOT NULL,
             duration_ms INTEGER NOT NULL,
-            timestamp TEXT NOT NULL
+            timestamp TEXT NOT NULL,
+            is_encumbered BOOLEAN
         )"
     )
     .execute(pool)
     .await?;
+
     debug!("Initialized database");
     Ok(())
 }
 
 /// Get all splits from the database
 pub async fn get_all_splits(pool: &SqlitePool) -> Result<Vec<Split>> {
-    let rows = sqlx::query("SELECT id, user, is_down, is_elevator, duration_ms, timestamp FROM splits")
+    let rows = sqlx::query("SELECT id, user, is_down, is_elevator, duration_ms, timestamp, is_encumbered FROM splits")
         .fetch_all(pool)
         .await?;
 
@@ -55,6 +57,7 @@ pub async fn get_all_splits(pool: &SqlitePool) -> Result<Vec<Split>> {
             is_elevator: row.get(3),
             duration_ms: row.get(4),
             timestamp: row.get(5),
+            is_encumbered: row.get(6),
         })
         .collect();
 
@@ -65,12 +68,13 @@ pub async fn get_all_splits(pool: &SqlitePool) -> Result<Vec<Split>> {
 pub async fn insert_split(pool: &SqlitePool, data: &SplitData) -> Result<()> {
     
     sqlx::query(
-        "INSERT INTO splits (user, is_down, is_elevator, duration_ms, timestamp) VALUES (?1, ?2, ?3, ?4, datetime('now'))"
+        "INSERT INTO splits (user, is_down, is_elevator, duration_ms, timestamp, is_encumbered) VALUES (?1, ?2, ?3, ?4, datetime('now'), ?5)"
     )
     .bind(&data.user)
     .bind(data.is_down)
     .bind(data.is_elevator)
     .bind(data.duration_ms)
+    .bind(data.is_encumbered)
     .execute(pool)
     .await?;
     
@@ -85,9 +89,20 @@ pub fn format_splits(splits: &[Split]) -> String {
             let direction = if split.is_down { "down" } else { "up" };
             let method = if split.is_elevator { "elevator" } else { "stairs" };
             let formatted_duration = DurationValidator::format_duration(split.duration_ms);
+            
+            let encumbered_text = if !split.is_elevator {
+                match split.is_encumbered {
+                    Some(true) => " while encumbered",
+                    Some(false) => " with nothing",
+                    None => "",
+                }
+            } else {
+                ""
+            };
+            
             format!(
-                "Entry {}: {} went {} the {} in {} on {}",
-                split.id, split.user, direction, method, formatted_duration, split.timestamp
+                "Entry {}: {} went {} the {}{} in {} on {}",
+                split.id, split.user, direction, method, encumbered_text, formatted_duration, split.timestamp
             )
         })
         .collect::<Vec<String>>()

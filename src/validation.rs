@@ -124,7 +124,7 @@ impl FieldValidator {
     pub fn validate_boolean(_value: bool, field_name: &str) -> ValidationResult<()> {
         // Booleans are always valid, but we can add specific business logic here
         match field_name {
-            "is_down" | "is_elevator" => Ok(()),
+            "is_down" | "is_elevator" | "is_encumbered" => Ok(()),
             _ => Err(ValidationError::FieldValidation {
                 field: field_name.to_string(),
                 message: "Unknown boolean field".to_string(),

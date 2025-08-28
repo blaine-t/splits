@@ -8,7 +8,7 @@ let userData = {
     username: '',
     isDown: null,
     isElevator: null,
-    carryingItems: null
+    isEncumbered: null
 };
 
 // Screen management
@@ -118,13 +118,13 @@ function selectMethod(method) {
     if (method === 'stairs') {
         nextScreen(); // Go to carrying screen
     } else {
-        userData.carryingItems = null;
+        userData.isEncumbered = null;
         submitSplit(); // Skip carrying screen for elevator
     }
 }
 
 function selectCarrying(carrying) {
-    userData.carryingItems = carrying;
+    userData.isEncumbered = carrying;
     submitSplit();
 }
 
@@ -138,9 +138,9 @@ async function submitSplit() {
         duration_ms: duration
     };
     
-    // Add carrying items to the data if applicable
-    if (userData.carryingItems !== null) {
-        splitData.carrying_items = userData.carryingItems;
+    // Add is_encumbered to the data if applicable (only for stairs)
+    if (userData.isEncumbered !== null && !userData.isElevator) {
+        splitData.is_encumbered = userData.isEncumbered;
     }
     
     try {
@@ -186,7 +186,7 @@ function resetApp() {
     isRunning = false;
     userData.isDown = null;
     userData.isElevator = null;
-    userData.carryingItems = null;
+    userData.isEncumbered = null;
     
     if (timerInterval) {
         clearInterval(timerInterval);
