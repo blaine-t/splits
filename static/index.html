@@ -5,172 +5,71 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Splits Timer</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 600px;
-            margin: 50px auto;
-            padding: 20px;
-        }
-
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-
-        input,
-        select {
-            width: 100%;
-            padding: 8px;
-            font-size: 16px;
-        }
-
-        button {
-            padding: 10px 20px;
-            font-size: 16px;
-            margin: 5px;
-            cursor: pointer;
-        }
-
-        .timer {
-            font-size: 24px;
-            font-weight: bold;
-            margin: 20px 0;
-            text-align: center;
-        }
-
-        .disabled {
-            opacity: 0.5;
-            pointer-events: none;
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
-    <h1>Splits Timer</h1>
+    <div class="container">
+        <!-- Start Screen -->
+        <div id="start-screen" class="screen">
+            <div class="timer-display">Splits</div>
+            <button class="circle-button start-button" onclick="startTimer()">START</button>
+        </div>
 
-    <div class="form-group">
-        <label for="username">Username:</label>
-        <input type="text" id="username" placeholder="Enter your username">
+        <!-- Timer Screen -->
+        <div id="timer-screen" class="screen">
+            <div id="timer-display" class="timer-display">00:00:000</div>
+            <button class="circle-button stop-button" onclick="stopTimer()">STOP</button>
+        </div>
+
+        <!-- Username Confirmation Screen -->
+        <div id="username-screen" class="screen">
+            <div class="form-container">
+                <h2 class="form-title">Confirm Your Name</h2>
+                <div class="form-group">
+                    <input type="text" id="username-input" class="form-input" placeholder="Enter your username">
+                </div>
+                <button class="form-button" onclick="confirmUsername()">Continue</button>
+            </div>
+        </div>
+
+        <!-- Direction Screen -->
+        <div id="direction-screen" class="screen">
+            <h2 class="question-title">Were you going...</h2>
+            <div class="choice-container">
+                <button class="choice-button" onclick="selectDirection('up')">UP</button>
+                <button class="choice-button" onclick="selectDirection('down')">DOWN</button>
+            </div>
+        </div>
+
+        <!-- Method Screen -->
+        <div id="method-screen" class="screen">
+            <h2 class="question-title">How did you travel?</h2>
+            <div class="choice-container">
+                <button class="choice-button" onclick="selectMethod('elevator')">ELEVATOR</button>
+                <button class="choice-button" onclick="selectMethod('stairs')">STAIRS</button>
+            </div>
+        </div>
+
+        <!-- Carrying Items Screen (only for stairs) -->
+        <div id="carrying-screen" class="screen">
+            <h2 class="question-title">Were you encumbered?</h2>
+            <div class="choice-container">
+                <button class="choice-button" onclick="selectCarrying(true)">YES</button>
+                <button class="choice-button" onclick="selectCarrying(false)">NO</button>
+            </div>
+        </div>
+
+        <!-- Loading/Results Screen -->
+        <div id="loading-screen" class="screen">
+            <div id="loading-content" class="loading-screen">
+                <div class="loading-spinner"></div>
+                <h2>Recording Split...</h2>
+            </div>
+        </div>
     </div>
 
-    <div class="form-group">
-        <label for="method">Method:</label>
-        <select id="method">
-            <option value="elevator">Elevator</option>
-            <option value="stairs">Stairs</option>
-        </select>
-    </div>
-
-    <div class="form-group">
-        <label for="direction">Direction:</label>
-        <select id="direction">
-            <option value="up">Up</option>
-            <option value="down">Down</option>
-        </select>
-    </div>
-
-    <div class="timer" id="timer">00:00:000</div>
-
-    <div>
-        <button id="startBtn" onclick="startTimer()">Start</button>
-        <button id="stopBtn" onclick="stopTimer()" disabled>Stop</button>
-    </div>
-
-    <script>
-        let startTime = 0;
-        let timerInterval = null;
-        let isRunning = false;
-
-        // Load username from localStorage
-        document.addEventListener('DOMContentLoaded', function () {
-            const savedUsername = localStorage.getItem('username');
-            if (savedUsername) {
-                document.getElementById('username').value = savedUsername;
-            }
-        });
-
-        // Save username to localStorage when it changes
-        document.getElementById('username').addEventListener('input', function () {
-            localStorage.setItem('username', this.value);
-        });
-
-        function startTimer() {
-            const username = document.getElementById('username').value.trim();
-            if (!username) {
-                alert('Please enter a username');
-                return;
-            }
-
-            startTime = Date.now();
-            isRunning = true;
-            document.getElementById('startBtn').disabled = true;
-            document.getElementById('stopBtn').disabled = false;
-
-            timerInterval = setInterval(updateTimer, 10);
-        }
-
-        function stopTimer() {
-            if (!isRunning) return;
-
-            const endTime = Date.now();
-            const duration = endTime - startTime;
-
-            clearInterval(timerInterval);
-            isRunning = false;
-            document.getElementById('startBtn').disabled = false;
-            document.getElementById('stopBtn').disabled = true;
-
-            sendSplit(duration);
-        }
-
-        function updateTimer() {
-            const elapsed = Date.now() - startTime;
-            const minutes = Math.floor(elapsed / 60000);
-            const seconds = Math.floor((elapsed % 60000) / 1000);
-            const milliseconds = elapsed % 1000;
-
-            document.getElementById('timer').textContent =
-                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}:${milliseconds.toString().padStart(3, '0')}`;
-        }
-
-        async function sendSplit(duration) {
-            const username = document.getElementById('username').value.trim();
-            const isElevator = document.getElementById('method').value === 'elevator';
-            const isDown = document.getElementById('direction').value === 'down';
-
-            const splitData = {
-                user: username,
-                is_down: isDown,
-                is_elevator: isElevator,
-                duration_ms: duration
-            };
-
-            try {
-                const response = await fetch('api/v0/split/new', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(splitData)
-                });
-
-                if (response.ok) {
-                    alert('Split recorded successfully!');
-                } else {
-                    alert('Failed to record split');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Error recording split');
-            }
-        }
-    </script>
+    <script src="script.js"></script>
 </body>
 
 </html>
