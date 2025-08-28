@@ -136,6 +136,26 @@ body {
   background: #5a6fd8;
 }
 
+.form-button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.error-message {
+  color: #ff6b6b;
+  font-size: 18px;
+  text-align: center;
+  margin-top: 10px;
+  padding: 10px;
+  background: rgba(255, 107, 107, 0.1);
+  border-radius: 5px;
+}
+
+.validation-error {
+  border-color: #ff6b6b !important;
+  background: rgba(255, 107, 107, 0.05);
+}
+
 .choice-container {
   display: flex;
   flex-direction: column;
@@ -201,4 +221,27 @@ body {
   color: white;
   text-align: center;
   margin-top: 20px;
+}
+
+@media (max-width: 768px) {
+  .choice-button {
+    min-width: 150px;
+    padding: 15px 30px;
+    font-size: 20px;
+  }
+  
+  .circle-button {
+    width: 150px;
+    height: 150px;
+    font-size: 24px;
+  }
+  
+  .timer-display {
+    font-size: 48px;
+  }
+  
+  .form-container {
+    padding: 20px;
+    margin: 10px;
+  }
 }

@@ -31,9 +31,32 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('username-input').value = savedUsername;
     }
     
+    // Add keyboard event listeners
+    document.addEventListener('keydown', handleKeyPress);
+    
     // Show first screen
     showScreen(0);
 });
+
+function handleKeyPress(event) {
+    if (event.key === 'Enter') {
+        const currentScreenId = screens[currentScreen];
+        
+        if (currentScreenId === 'username-screen') {
+            confirmUsername();
+        }
+    }
+    
+    if (event.key === ' ' || event.key === 'Spacebar') {
+        event.preventDefault();
+        
+        if (currentScreen === 0) {
+            startTimer();
+        } else if (currentScreen === 1 && isRunning) {
+            stopTimer();
+        }
+    }
+}
 
 function showScreen(screenIndex) {
     // Hide all screens
@@ -66,9 +89,19 @@ function nextScreen() {
 
 // Timer functions
 function startTimer() {
+    if (isRunning) return;
+    
     startTime = Date.now();
     isRunning = true;
-    timerInterval = setInterval(updateTimer, 16); // ~60fps
+    
+    function animate() {
+        if (isRunning) {
+            updateTimer();
+            requestAnimationFrame(animate);
+        }
+    }
+    animate();
+    
     nextScreen();
 }
 
@@ -78,7 +111,6 @@ function stopTimer() {
     const endTime = Date.now();
     duration = endTime - startTime;
     
-    clearInterval(timerInterval);
     isRunning = false;
     
     nextScreen();
