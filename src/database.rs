@@ -103,8 +103,25 @@ pub async fn is_world_record(pool: &SqlitePool, split: &Split) -> Result<bool> {
     Ok(count == 0)
 }
 
+/// Check if the split data matches the user's most recent entry duration
+async fn is_duplicate_entry(pool: &SqlitePool, data: &SplitData) -> Result<bool> {
+    let last_duration: Option<i32> = sqlx::query_scalar(
+        "SELECT duration_ms FROM splits WHERE user = ?1 ORDER BY created_at DESC LIMIT 1"
+    )
+    .bind(&data.user)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(last_duration == Some(data.duration_ms))
+}
+
 /// Insert a new split into the database
 pub async fn insert_split(pool: &SqlitePool, data: &SplitData) -> Result<()> {
+    // Check if this is a duplicate of the user's last entry
+    if is_duplicate_entry(pool, data).await? {
+        warn!("Ignoring duplicate entry for user {} with duration {}ms", data.user, data.duration_ms);
+        return Err(crate::AppError::DuplicateEntry);
+    }
     
     sqlx::query(
         "INSERT INTO splits (user, is_down, is_elevator, is_encumbered, duration_ms) VALUES (?1, ?2, ?3, ?4, ?5)"

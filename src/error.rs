@@ -10,6 +10,8 @@ pub enum AppError {
     EnvVar(#[from] std::env::VarError),
     #[error("Network error: {0}")]
     Network(#[from] std::io::Error),
+    #[error("Duplicate entry error")]
+    DuplicateEntry,
 }
 
 pub type Result<T> = std::result::Result<T, AppError>;
