@@ -138,7 +138,6 @@ async function submitSplit() {
         duration_ms: duration
     };
     
-    // Add is_encumbered to the data if applicable (only for stairs)
     if (userData.isEncumbered !== null && !userData.isElevator) {
         splitData.is_encumbered = userData.isEncumbered;
     }
@@ -155,11 +154,12 @@ async function submitSplit() {
         if (response.ok) {
             showSuccessMessage();
         } else {
-            showErrorMessage('Failed to record split');
+            const errorText = await response.text();
+            showErrorMessage(`Failed to record split: ${errorText}`);
         }
     } catch (error) {
         console.error('Error:', error);
-        showErrorMessage('Error recording split');
+        showErrorMessage(`Network error: ${error.message}`);
     }
 }
 

@@ -25,26 +25,27 @@ pub fn create_sqlite_database_if_does_not_exist(url: &String) -> Result<()> {
 /// Initialize the database and create tables if they don't exist
 pub async fn initialize_database(pool: &SqlitePool) -> Result<()> {
     sqlx::query(
-        "CREATE TABLE IF NOT EXISTS splits (
+        r#"
+        CREATE TABLE IF NOT EXISTS splits (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user TEXT NOT NULL,
             is_down BOOLEAN NOT NULL,
             is_elevator BOOLEAN NOT NULL,
+            is_encumbered BOOLEAN,
             duration_ms INTEGER NOT NULL,
-            timestamp TEXT NOT NULL,
-            is_encumbered BOOLEAN
-        )"
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        "#,
     )
     .execute(pool)
     .await?;
-
-    debug!("Initialized database");
+    
     Ok(())
 }
 
-/// Get all splits from the database
+/// Get all splits from the database (ordered by most recent first, utilizes idx_splits_created_at)
 pub async fn get_all_splits(pool: &SqlitePool) -> Result<Vec<Split>> {
-    let rows = sqlx::query("SELECT id, user, is_down, is_elevator, duration_ms, timestamp, is_encumbered FROM splits")
+    let rows = sqlx::query("SELECT id, user, is_down, is_elevator, is_encumbered, duration_ms, created_at FROM splits ORDER BY created_at DESC")
         .fetch_all(pool)
         .await?;
 
@@ -55,9 +56,9 @@ pub async fn get_all_splits(pool: &SqlitePool) -> Result<Vec<Split>> {
             user: row.get(1),
             is_down: row.get(2),
             is_elevator: row.get(3),
-            duration_ms: row.get(4),
-            timestamp: row.get(5),
-            is_encumbered: row.get(6),
+            is_encumbered: row.get(4),
+            duration_ms: row.get(5),
+            created_at: row.get(6),
         })
         .collect();
 
@@ -66,7 +67,7 @@ pub async fn get_all_splits(pool: &SqlitePool) -> Result<Vec<Split>> {
 
 /// Get the most recent split from the database
 pub async fn get_most_recent_split(pool: &SqlitePool) -> Result<Option<Split>> {
-    let row = sqlx::query("SELECT id, user, is_down, is_elevator, duration_ms, timestamp, is_encumbered FROM splits ORDER BY id DESC LIMIT 1")
+    let row = sqlx::query("SELECT id, user, is_down, is_elevator, is_encumbered, duration_ms, created_at FROM splits ORDER BY created_at DESC LIMIT 1")
         .fetch_optional(pool)
         .await?;
 
@@ -76,9 +77,9 @@ pub async fn get_most_recent_split(pool: &SqlitePool) -> Result<Option<Split>> {
             user: row.get(1),
             is_down: row.get(2),
             is_elevator: row.get(3),
-            duration_ms: row.get(4),
-            timestamp: row.get(5),
-            is_encumbered: row.get(6),
+            is_encumbered: row.get(4),
+            duration_ms: row.get(5),
+            created_at: row.get(6),
         })),
         None => Ok(None),
     }
@@ -106,13 +107,13 @@ pub async fn is_world_record(pool: &SqlitePool, split: &Split) -> Result<bool> {
 pub async fn insert_split(pool: &SqlitePool, data: &SplitData) -> Result<()> {
     
     sqlx::query(
-        "INSERT INTO splits (user, is_down, is_elevator, duration_ms, timestamp, is_encumbered) VALUES (?1, ?2, ?3, ?4, datetime('now'), ?5)"
+        "INSERT INTO splits (user, is_down, is_elevator, is_encumbered, duration_ms) VALUES (?1, ?2, ?3, ?4, ?5)"
     )
     .bind(&data.user)
     .bind(data.is_down)
     .bind(data.is_elevator)
-    .bind(data.duration_ms)
     .bind(data.is_encumbered)
+    .bind(data.duration_ms)
     .execute(pool)
     .await?;
     
@@ -140,7 +141,7 @@ pub fn format_splits(splits: &[Split]) -> String {
             
             format!(
                 "Entry {}: {} went {} the {}{} in {} on {}",
-                split.id, split.user, direction, method, encumbered_text, formatted_duration, split.timestamp
+                split.id, split.user, direction, method, encumbered_text, formatted_duration, split.created_at
             )
         })
         .collect::<Vec<String>>()
@@ -165,7 +166,7 @@ pub fn format_single_split(split: &Split, is_wr: bool) -> String {
     
     let content = format!(
         "{} went {} the {}{} in {} on {}",
-        split.user, direction, method, encumbered_text, formatted_duration, split.timestamp
+        split.user, direction, method, encumbered_text, formatted_duration, split.created_at
     );
     
     if is_wr {

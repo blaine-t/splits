@@ -12,9 +12,9 @@ pub struct Split {
     pub user: String,
     pub is_down: bool,
     pub is_elevator: bool,
-    pub duration_ms: i32,
-    pub timestamp: String,
     pub is_encumbered: Option<bool>,
+    pub duration_ms: i32,
+    pub created_at: String
 }
 
 #[derive(Clone, Deserialize, Debug)]
