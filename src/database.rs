@@ -64,6 +64,44 @@ pub async fn get_all_splits(pool: &SqlitePool) -> Result<Vec<Split>> {
     Ok(splits)
 }
 
+/// Get the most recent split from the database
+pub async fn get_most_recent_split(pool: &SqlitePool) -> Result<Option<Split>> {
+    let row = sqlx::query("SELECT id, user, is_down, is_elevator, duration_ms, timestamp, is_encumbered FROM splits ORDER BY id DESC LIMIT 1")
+        .fetch_optional(pool)
+        .await?;
+
+    match row {
+        Some(row) => Ok(Some(Split {
+            id: row.get(0),
+            user: row.get(1),
+            is_down: row.get(2),
+            is_elevator: row.get(3),
+            duration_ms: row.get(4),
+            timestamp: row.get(5),
+            is_encumbered: row.get(6),
+        })),
+        None => Ok(None),
+    }
+}
+
+/// Check if a split is a world record (WR) for its category
+/// A WR is when no other entry exists with the same is_down, is_elevator, and is_encumbered status
+/// with a better (lower) duration
+pub async fn is_world_record(pool: &SqlitePool, split: &Split) -> Result<bool> {
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM splits 
+         WHERE is_down = ?1 AND is_elevator = ?2 AND is_encumbered = ?3 AND duration_ms < ?4"
+    )
+    .bind(split.is_down)
+    .bind(split.is_elevator)
+    .bind(split.is_encumbered)
+    .bind(split.duration_ms)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(count == 0)
+}
+
 /// Insert a new split into the database
 pub async fn insert_split(pool: &SqlitePool, data: &SplitData) -> Result<()> {
     
@@ -107,4 +145,32 @@ pub fn format_splits(splits: &[Split]) -> String {
         })
         .collect::<Vec<String>>()
         .join("\n")
+}
+
+/// Format a single split for display, with optional WR decoration
+pub fn format_single_split(split: &Split, is_wr: bool) -> String {
+    let direction = if split.is_down { "down" } else { "up" };
+    let method = if split.is_elevator { "elevator" } else { "stairs" };
+    let formatted_duration = DurationValidator::format_duration(split.duration_ms);
+    
+    let encumbered_text = if !split.is_elevator {
+        match split.is_encumbered {
+            Some(true) => " while encumbered",
+            Some(false) => " with nothing",
+            None => "",
+        }
+    } else {
+        ""
+    };
+    
+    let content = format!(
+        "{} went {} the {}{} in {} on {}",
+        split.user, direction, method, encumbered_text, formatted_duration, split.timestamp
+    );
+    
+    if is_wr {
+        format!("@here NEW WR! {} 🎉", content)
+    } else {
+        content
+    }
 }

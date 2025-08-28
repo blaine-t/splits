@@ -44,9 +44,9 @@ impl UsernameValidator {
 
         // Check whitelist first (if not empty)
         if !config.username_whitelist.is_empty() {
-            let lower_username = username.to_lowercase();
+            let lower_username = username;
             let is_whitelisted = config.username_whitelist.iter()
-                .any(|allowed| lower_username == allowed.to_lowercase());
+                .any(|allowed| lower_username == allowed);
             
             if !is_whitelisted {
                 return Err(ValidationError::InvalidUsername(
@@ -55,9 +55,8 @@ impl UsernameValidator {
             }
         } else if !config.username_blacklist.is_empty() {
             // Use blacklist if whitelist is empty
-            let lower_username = username.to_lowercase();
             let is_blacklisted = config.username_blacklist.iter()
-                .any(|prohibited| lower_username.contains(&prohibited.to_lowercase()));
+                .any(|prohibited| username.contains(prohibited));
             
             if is_blacklisted {
                 return Err(ValidationError::InvalidUsername(
