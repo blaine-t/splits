@@ -262,6 +262,51 @@ pub async fn get_world_records(pool: &SqlitePool) -> Result<Vec<Split>> {
     Ok(world_records)
 }
 
+/// Get the slowest record (worst time) for each category
+pub async fn get_slowest_records(pool: &SqlitePool) -> Result<Vec<Split>> {
+    let mut slowest_records = Vec::new();
+    let categories = [
+        (true, true, None),
+        (false, true, None),
+        (true, false, Some(true)),
+        (true, false, Some(false)),
+        (false, false, Some(true)),
+        (false, false, Some(false)),
+    ];
+    for (is_down, is_elevator, is_encumbered) in categories {
+        let row = if is_elevator {
+            sqlx::query("SELECT id, user, is_down, is_elevator, is_encumbered, duration_ms, created_at FROM splits \
+                        WHERE is_down = ?1 AND is_elevator = ?2 \
+                        ORDER BY duration_ms DESC LIMIT 1")
+                .bind(is_down)
+                .bind(is_elevator)
+                .fetch_optional(pool)
+                .await?
+        } else {
+            sqlx::query("SELECT id, user, is_down, is_elevator, is_encumbered, duration_ms, created_at FROM splits \
+                        WHERE is_down = ?1 AND is_elevator = ?2 AND is_encumbered = ?3 \
+                        ORDER BY duration_ms DESC LIMIT 1")
+                .bind(is_down)
+                .bind(is_elevator)
+                .bind(is_encumbered)
+                .fetch_optional(pool)
+                .await?
+        };
+        if let Some(row) = row {
+            slowest_records.push(Split {
+                id: row.get(0),
+                user: row.get(1),
+                is_down: row.get(2),
+                is_elevator: row.get(3),
+                is_encumbered: row.get(4),
+                duration_ms: row.get(5),
+                created_at: row.get(6),
+            });
+        }
+    }
+    Ok(slowest_records)
+}
+
 /// Format world records for display
 pub fn format_world_records(world_records: &[Split]) -> String {
     if world_records.is_empty() {

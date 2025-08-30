@@ -30,9 +30,23 @@ pub async fn world_records_board(
     Ok(())
 }
 
+/// Display the slowest board showing the worst time in each category
+#[poise::command(slash_command, rename = "slowboard")]
+pub async fn slowest_board(
+    ctx: Context<'_>,
+) -> Result<(), Error> {
+    ctx.defer().await?;
+    let slowest_records = crate::database::get_slowest_records(&ctx.data().db_pool).await
+        .map_err(|e| format!("Database error: {}", e))?;
+    let response = crate::database::format_world_records(&slowest_records);
+    ctx.send(poise::CreateReply::default().content(response)).await?;
+    Ok(())
+}
+
 /// Register all slash commands
 pub fn commands() -> Vec<poise::Command<Data, Error>> {
     vec![
         world_records_board(),
+        slowest_board(),
     ]
 }
